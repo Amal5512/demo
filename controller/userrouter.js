@@ -1,62 +1,68 @@
-const express=require("express")
-const usermodel=require("../models/usermodel")
-const router=express.Router()
-const bcrypt=require("bcrypt")
+const express = require("express");
+const bcrypt = require("bcryptjs");
+const userModel = require("../models/userModel");
 
+const router = express.Router();
 
-hashPaswordGenerator =async(pass)=>{
-    const salt = await bcrypt.genSalt(10)
-    return bcrypt.hash(pass,salt)
-}
+//signup
+const hashFunction = async (password) => {
+  const salt = await bcrypt.genSalt(10);
+  return bcrypt.hash(password, salt);
+};
+router.post("/signup", async (req, res) => {
+  try {
+    let inputPassword = req.body.password;
+    let data = req.body;
+    let hashedPass = await hashFunction(inputPassword);
+    data.password = hashedPass;
+    let userModelObj = new userModel(data);
+    await userModelObj.save();
+    res.json({ status: "success" });
+  } catch (error) {
+    console.log("error");
+    console.error(error);
+    res
+      .status(500)
+      .json({
+        status: "error",
+        message: "An error occurred during the signup process.",
+      });
+  }
+});
 
-router.post("/signup", async(req,res)=>{
-    let {data} = {"data":req.body}
-      let password =data.password
-        hashPaswordGenerator(password).then(
-            (hashedPassword)=>{
-                console.log(hashedPassword)
-                data.password=hashedPassword
-                console.log(data)
-               
-                 let user =new usermodel(data)
-                let result =user.save()
-               
-                res.json({status:"success"})
-            }
-        )
-
-   
-})
-
-router.post("/signin",async(req,res)=>{
-    let input=req.body
-    let email=req.body.email
-    let data=await usermodel.findOne({"email":email})
-    if(!data){
-        return res.json({
-            status:"Invalid user"
-        })
+//signin
+router.post("/signin", async (req, res) => {
+  try {
+    let inputPassword = req.body.password;
+    let email = req.body.email;
+    let data = await userModel.findOne({ email: email });
+    if (!data) {
+      return res.json({
+        status: "no user",
+      });
     }
+    let dbPassword = data.password;
+    let match = await bcrypt.compare(inputPassword, dbPassword);
+    if (!match) {
+      return res.json({
+        status: "incorrect password",
+      });
+    }
+    res.json({
+      status: "success",
+      userData: data,
+    });
     
-    console.log(data)
-    let dbpassword=data.password
-    let inputpassword=req.body.password
-    console.log(dbpassword)
-    console.log(inputpassword)
-    const match=await bcrypt.compare(inputpassword,dbpassword)
-    if(!match){
-        return res.json({
-            status:"invalid password"
-        })
-    }
-    res.json(
-        {status:"succes","userdata":data}
-    )
-})
 
-router.get("/view",async(req,res)=>{
-    let result=await usermodel.find()
-    res.json(result)
-})
+  } catch (error) {
+    console.error(error);
+    console.log("error occured");
+    res.status(500).json({
+      status: "error",
+      message: "An error occurred during the sign in process.",
+    });
+  }
+});
 
-module.exports =router
+
+module.exports=router
